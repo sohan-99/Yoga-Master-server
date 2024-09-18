@@ -106,6 +106,96 @@ app.put('/update-user/:id', async (req, res) => {
 });
 // -------------user route end---------------
 
+// -------------payment route start---------------
+// payment with stripe
+app.post("/create-payment-intent", async (req, res) => {
+  const { price } = req.body;
+  const amount = parseInt(price) * 100;
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: amount,
+    currency: "usd",
+    payment_method_types: ["card"],
+  });
+  res.send({
+    clientSecret: paymentIntent.client_secret,
+  });
+});
+// post payment info to DB
+app.post("/payment-info", async (req, res) => {
+  const paymentInfo = req.body;
+  const classesId = paymentInfo.classesId;
+  const userEmail = paymentInfo.userEmail;
+  const singleClassId = req.query.classId;
+  let query;
+  if (singleClassId) {
+    query = { classId: singleClassId, userMail: userEmail };
+  } else {
+    query = { classId: { $in: classesId } };
+  }
+
+  const classesQuery = {
+    _id: { $in: classesId.map((id) => new ObjectId(id)) },
+  };
+  const classes = await classesCollection.find(classesQuery).toArray();
+
+  const newEnrolledData = {
+    userEmail: userEmail,
+    classId: singleClassId.map((id) => new ObjectId(id)),
+    transactionId: paymentInfo.transactionId,
+  };
+
+  const updatedDoc = {
+    $set: {
+      totalEnrolled:
+        classes.reduce((total, current) => total + current.totalEnrolled, 0) +
+          1 || 0,
+      availableSeats:
+        classes.reduce((total, current) => total + current.availableSeats, 0) -
+          1 || 0,
+    },
+  };
+
+  const updatedResult = await classesCollection.updateMany(
+    classesQuery,
+    updatedDoc,
+    { upsert: true }
+  );
+  const enrolledResult = await enrolledCollection.insertOne(newEnrolledData);
+  const deletedResult = await cartCollection.deleteMany(query);
+  const paymentResult = await paymentCollection.insertOne(paymentInfo);
+
+  res.send({ paymentResult, deletedResult, enrolledResult, updatedResult });
+});
+// get payment History
+app.get("/payment-history/:email", async (req, res) => {
+  const email = req.params.email;
+  const query = { userEmail: email };
+  const result = await paymentCollection
+    .find(query)
+    .sort({ date: -1 })
+    .toArray();
+  res.send(result);
+});
+// Fetch payment history by email
+app.get("/payment-history/:email", async (req, res) => {
+  const email = req.params.email;
+  const query = { userEmail: email };
+  const result = await paymentCollection
+    .find(query)
+    .sort({ date: -1 })
+    .toArray();
+  res.send(result);
+});
+
+// Fetch payment history length by email
+app.get("/payment-history-length/:email", async (req, res) => {
+  const email = req.params.email;
+  const query = { userEmail: email };
+  const total = await paymentCollection.countDocuments(query);
+  res.send({ total });
+});
+// -------------payment route end---------------
+
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
