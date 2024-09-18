@@ -50,12 +50,61 @@ async function connectToDatabase() {
   }
 }
 
-
-
-
-
-
-
+connectToDatabase();
+// ----------------user route start-------------------
+// routes for users
+app.post('/new-user', async (req, res) => {
+  const newUser = req.body;
+  const result = await usersCollection.insertOne(newUser);
+  res.send(result);
+});
+//get user 
+app.get('/users', async (req, res) => {
+  const result = await usersCollection.find({}).toArray();
+  res.send(result);
+}); 
+// user get by id
+app.get('/users/:id', async (req, res) => {
+  const id = req.params.id;
+  const query = { _id: new ObjectId(id) };
+  const result = await usersCollection.findOne(query);
+  res.send(result);
+});
+// user get by email
+app.get('/user/:email', async (req, res) => {
+  const email = req.params.email;
+  const query = { email: email };
+  const result = await usersCollection.findOne(query);
+  res.send(result);
+});
+// delete user by id
+app.delete('/delete-user/:id', async (req, res) => {
+  const id = req.params.id;
+  const query = { _id: new ObjectId(id) };
+  const result = await usersCollection.deleteOne(query);
+  res.send(result);
+});
+// user uodate one by one
+app.put('/update-user/:id', async (req, res) => {
+  const id = req.params.id;
+  const updatedUser = req.body;
+  const filter = { _id: new ObjectId(id) };
+  const options = { upsert: true };
+  const updateDoc = {
+    $set: {
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: updatedUser.option,
+      address: updatedUser.address,
+      about: updatedUser.about,
+      photoUrl: updatedUser.photoUrl,
+      skills: updatedUser.skills ? updatedUser.skills : null,
+    },
+  };
+  const result = await usersCollection.updateOne(filter, updateDoc, options);
+  res.send(result);
+});
+// -------------user route end---------------
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
