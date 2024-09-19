@@ -238,7 +238,47 @@ app.put("/update-class/:id", async (req, res) => {
   }
 });
 // -------------classes route end---------------
+// -------------cart route start---------------
+// cart collection
+app.post("/add-to-cart", async (req, res) => {
+  const newCartItem = req.body;
+  const result = await cartCollection.insertOne(newCartItem);
+  res.send(result);
+});
+// cart item get by id
+app.get("/cart-item/:id", async (req, res) => {
+  const id = req.params.id;
+  const email = req.body.email;
+  const query = {
+    classId: id,
+    email: email,
+  };
+  const projection = { classId: 1 };
+  const result = await cartCollection.findOne(query, { projection });
+  res.send(result);
+});
 
+// cart item get by email address
+app.get("/cart/:email", async (req, res) => {
+  const { email } = req.params;
+  const query = { userMail: email };
+  const projection = { classId: 1 };
+
+  const carts = await cartCollection.find(query, { projection }).toArray();
+  const classIds = carts.map((cart) => new ObjectId(cart.classId));
+  const query2 = { _id: { $in: classIds } };
+  const result = await classesCollection.find(query2).toArray();
+
+  res.send(result);
+});
+// DELETE route for removing a cart item
+app.delete("/delete-cart-item/:id", async (req, res) => {
+  const id = req.params.id;
+  const query = { classId: id };
+  const result = await cartCollection.deleteOne(query);
+  res.send(result);
+});
+// -------------cart route end---------------
 // -------------payment route start---------------
 // payment with stripe
 app.post("/create-payment-intent", async (req, res) => {
