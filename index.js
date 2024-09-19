@@ -105,6 +105,139 @@ app.put('/update-user/:id', async (req, res) => {
   res.send(result);
 });
 // -------------user route end---------------
+// -------------classes route start---------------
+// Define routes
+app.post("/new-class", async (req, res) => {
+  try {
+    const newClass = req.body;
+    const result = await classesCollection.insertOne(newClass);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send("Error inserting document");
+  }
+});
+
+// Get all classes
+app.get("/classes", async (req, res) => {
+  try {
+    const approvedClasses = await classesCollection
+      .find({ status: "panding" })
+      .toArray();
+    res.json(approvedClasses);
+  } catch (error) {
+    res.status(500).send("Error retrieving approved classes");
+  }
+});
+
+// Get instructor email address
+app.get("/classes/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+    const query = { instructorEmail: email };
+    const result = await classesCollection.find(query).toArray();
+    res.json(result);
+  } catch (error) {
+    res.status(500).send("Error retrieving classes");
+  }
+});
+
+// Change class status
+app.patch("/change-status/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const status = req.body.status;
+    const reason = req.body.reason;
+    const filter = { _id: new ObjectId(id) };
+    const updateDoc = {
+      $set: {
+        status: status,
+        reason: reason,
+      },
+    };
+    const result = await classesCollection.updateOne(filter, updateDoc);
+    res.send(result);
+  } catch (error) {
+    res.status(500).send("Error updating class status");
+  }
+});
+
+// Manage class
+app.get("/classes-manage", async (req, res) => {
+  try {
+    const result = await classesCollection.find().toArray();
+    res.send(result);
+  } catch (error) {
+    res.status(500).send("Error retrieving classes");
+  }
+});
+
+// Get approved classes
+app.get("/approved-classes", async (req, res) => {
+  try {
+    const approvedClasses = await classesCollection
+      .find({ status: "approved" })
+      .toArray();
+    res.json(approvedClasses);
+  } catch (error) {
+    res.status(500).send("Error retrieving approved classes");
+  }
+});
+
+// Get single class
+app.get("/class/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const query = { _id: new ObjectId(id) };
+    const result = await classesCollection.findOne(query);
+
+    if (result) {
+      res.json(result);
+    } else {
+      res.status(404).send("Class not found");
+    }
+  } catch (error) {
+    res.status(500).send("Error retrieving the class");
+  }
+});
+
+// Update class
+app.put("/update-class/:id", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const updatedData = req.body;
+    const query = { _id: new ObjectId(id) };
+
+    const updateDoc = {
+      $set: {
+        name: updatedData.name,
+        image: updatedData.image,
+        availableSeats: parseInt(updatedData.availableSeats, 10),
+        price: parseFloat(updatedData.price),
+        videoLink: updatedData.videoLink,
+        description: updatedData.description,
+        instructorName: updatedData.instructorName,
+        instructorEmail: updatedData.instructorEmail,
+        status: updatedData.status || "pending",
+        submitted: updatedData.submitted,
+        totalEnrolled: parseInt(updatedData.totalEnrolled, 10),
+        reason: updatedData.reason,
+      },
+    };
+
+    const result = await classesCollection.updateOne(query, updateDoc, {
+      upsert: true,
+    });
+
+    if (result.modifiedCount > 0 || result.upsertedCount > 0) {
+      res.send(result);
+    } else {
+      res.status(404).send("Class not found or no changes made");
+    }
+  } catch (error) {
+    res.status(500).send("Error updating the class");
+  }
+});
+// -------------classes route end---------------
 
 // -------------payment route start---------------
 // payment with stripe
@@ -195,6 +328,7 @@ app.get("/payment-history-length/:email", async (req, res) => {
   res.send({ total });
 });
 // -------------payment route end---------------
+
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
