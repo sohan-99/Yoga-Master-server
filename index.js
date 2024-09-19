@@ -368,6 +368,18 @@ app.get("/payment-history-length/:email", async (req, res) => {
   res.send({ total });
 });
 // -------------payment route end---------------
+// -------------enrolled route start---------------
+// enrolledment routes
+app.get("/popular-classes", async (req, res) => {
+  const result = await classesCollection
+    .find()
+    .sort({ totalEnrolled: -1 })
+    .limit(6)
+    .toArray();
+  res.send(result);
+});
+// -------------enrolled route end---------------
+
 
 
 app.listen(port, () => {
