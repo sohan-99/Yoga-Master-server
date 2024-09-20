@@ -379,7 +379,115 @@ app.get("/popular-classes", async (req, res) => {
   res.send(result);
 });
 // -------------enrolled route end---------------
-
+// -------------instructors route start---------------
+//popular instructure
+app.get("/popular-instructors", async (req, res) => {
+  const pipeline = [
+    {
+      $group: {
+        _id: "$instructorEmail",
+        totalEnrolled: { $sum: "$totalEnrolled" },
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "_id",
+        foreignField: "email",
+        as: "instructor",
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        instructor: { $arrayElemAt: ["$instructor", 0] },
+        totalEnrolled: 1,
+      },
+    },
+    {
+      $sort: { totalEnrolled: -1 },
+    },
+    {
+      $limit: 6,
+    },
+  ];
+  const result = await classesCollection.aggregate(pipeline).toArray();
+  res.send(result);
+});
+// admin status
+app.get("/admin-stats", async (req, res) => {
+  const approvedClasses = (
+    await classesCollection.find({ status: "approved" })
+  ).toArray().length;
+  const pendingClasses = (
+    await classesCollection.find({ status: "pending" })
+  ).toArray().length;
+  const instructors = (
+    await usersCollection.find({ role: "instructor" })
+  ).toArray().length;
+  const totalClasses = (await classesCollection.find()).toArray().length;
+  const totalEnrolled = (await enrolledCollection.find()).toArray().length;
+  const result = {
+    approvedClasses,
+    pendingClasses,
+    instructors,
+    totalClasses,
+    totalEnrolled,
+  };
+  res.send(result);
+});
+app.get('/enrolled-classes/:email', async (req, res) => {
+  const email = req.params.email;
+  const query = { userEail: email };
+  const pipeline = [
+    {
+      $match: query
+    },
+    {
+      $lookup: {
+        from: "classes",
+        localField: "classesId",
+        foreignField: "_id",
+        as: "classes"
+      }
+    },
+    {
+      $unwind: "$classes"
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "classes.instructorEmail",
+        foreignField: "email",
+        as: "instructor"
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        instructor: {
+          $arrayElemAt: ["$instructor", 0]
+        },
+        classes: 1
+      }
+    }
+  ];
+  const result = await enrolledCollection.aggregate(pipeline).toArray();
+  res.send(result);
+  });
+// appliend for instructors
+app.post('/ass-instructor', async (req, res) => {
+  const data = req.body;
+  const result = await appliedCollection.insertOne(data);
+  res.send(result);
+});
+// instructor get by email  address
+app.get('/applied-instructors/:email', async (req, res) => {
+  const email = req.params.email;
+  const result = await appliedCollection.findOne({ email });
+  res.send(result);
+});
+// -------------instructor route end---------------
 
 
 app.listen(port, () => {
