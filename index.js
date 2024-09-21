@@ -3,7 +3,26 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const stripe = require("stripe")(process.env.PAYMENT_SECRET);
+const jwt = require('jsonwebtoken');
 const port = process.env.PORT || 3001;
+
+// verify that token
+const verifyJWT = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res.status(401).send({ message: 'Invalid authorization' });
+  }
+
+  const token = authorization?.split(' ')[1];
+  jwt.verify(token, process.env.ASSESS_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).send({ message: 'Forbidden access' });
+    }
+    req.decoded = decoded;
+    next();
+  });
+};
+
 
 const {
   MongoClient,
@@ -11,7 +30,7 @@ const {
   ObjectId,
   CURSOR_FLAGS,
 } = require("mongodb");
-
+//connection mongodb
 const uri = `mongodb+srv://${process.env.MONGODB_USERNAME}:${process.env.MONGODB_PASSWORD}@${process.env.MONGODB_CLUSTER}/?retryWrites=true&w=majority&appName=${process.env.MONGODB_DB}`;
 
 const client = new MongoClient(uri, {
@@ -51,6 +70,16 @@ async function connectToDatabase() {
 }
 
 connectToDatabase();
+// token create by jwt
+app.post("/api/set-token", async (req, res) => {
+  const user = req.body;
+  const token = jwt.sign(user, process.env.ACCESS_SECRET, {
+    expiresIn: "24h"
+  });
+
+  res.send(token);
+});
+
 // ----------------user route start-------------------
 // routes for users
 app.post('/new-user', async (req, res) => {
@@ -118,8 +147,9 @@ app.post("/new-class", async (req, res) => {
 });
 
 // Get all classes
-app.get("/classes", async (req, res) => {
+app.get("/classes",verifyJWT, async (req, res) => {
   try {
+    console.log(req.headers);
     const approvedClasses = await classesCollection
       .find({ status: "panding" })
       .toArray();
