@@ -5,16 +5,14 @@ const cors = require("cors");
 const stripe = require("stripe")(process.env.PAYMENT_SECRET);
 const jwt = require('jsonwebtoken');
 const port = process.env.PORT || 3001;
-
 // verify that token
 const verifyJWT = (req, res, next) => {
   const authorization = req.headers.authorization;
   if (!authorization) {
     return res.status(401).send({ message: 'Invalid authorization' });
   }
-
   const token = authorization?.split(' ')[1];
-  jwt.verify(token, process.env.ASSESS_SECRET, (err, decoded) => {
+  jwt.verify(token, process.env.ACCESS_SECRET, (err, decoded) => {
     if (err) {
       return res.status(403).send({ message: 'Forbidden access' });
     }
@@ -22,6 +20,7 @@ const verifyJWT = (req, res, next) => {
     next();
   });
 };
+
 
 
 const {
@@ -149,7 +148,6 @@ app.post("/new-class", async (req, res) => {
 // Get all classes
 app.get("/classes",verifyJWT, async (req, res) => {
   try {
-    console.log(req.headers);
     const approvedClasses = await classesCollection
       .find({ status: "panding" })
       .toArray();
