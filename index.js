@@ -69,6 +69,47 @@ async function connectToDatabase() {
 }
 
 connectToDatabase();
+// middleware for admin and instructor
+// const verifyAdmin = async (req, res, next) => {
+//   const email = req.decoded.email;
+//   const query = { email: email };
+//   const user = await usersCollection.findOne(query);
+//   if (user.role === 'admin') {
+//     next();
+//   } else {
+//     return res.status(401).send({ message: 'Unauthorized access' });
+//   }
+// };
+
+// const verifyInstructor = async (req, res, next) => {
+//   const email = req.decoded.email;
+//   const query = { email: email };
+//   const user = await usersCollection.findOne(query);
+//   if (user.role === 'instructor') {
+//     next();
+//   } else {
+//     return res.status(401).send({ message: 'Unauthorized access' });
+//   }
+// };
+const verifyRole = (role) => {
+  return async (req, res, next) => {
+    const email = req.decoded.email;
+    const query = { email: email };
+    const user = await usersCollection.findOne(query);
+
+    if (user && user.role === role) {
+      next();
+    } else {
+      return res.status(401).send({ message: 'Unauthorized access' });
+    }
+  };
+};
+
+// Usage for different roles:
+const verifyAdmin = verifyRole('admin');
+const verifyInstructor = verifyRole('instructor');
+
+
 // token create by jwt
 app.post("/api/set-token", async (req, res) => {
   const user = req.body;
@@ -99,21 +140,21 @@ app.get('/users/:id', async (req, res) => {
   res.send(result);
 });
 // user get by email
-app.get('/user/:email', async (req, res) => {
+app.get('/user/:email',verifyJWT, async (req, res) => {
   const email = req.params.email;
   const query = { email: email };
   const result = await usersCollection.findOne(query);
   res.send(result);
 });
 // delete user by id
-app.delete('/delete-user/:id', async (req, res) => {
+app.delete('/delete-user/:id',verifyJWT,verifyAdmin, async (req, res) => {
   const id = req.params.id;
   const query = { _id: new ObjectId(id) };
   const result = await usersCollection.deleteOne(query);
   res.send(result);
 });
 // user uodate one by one
-app.put('/update-user/:id', async (req, res) => {
+app.put('/update-user/:id',verifyJWT,verifyAdmin, async (req, res) => {
   const id = req.params.id;
   const updatedUser = req.body;
   const filter = { _id: new ObjectId(id) };
@@ -135,7 +176,7 @@ app.put('/update-user/:id', async (req, res) => {
 // -------------user route end---------------
 // -------------classes route start---------------
 // Define routes
-app.post("/new-class", async (req, res) => {
+app.post("/new-class",verifyJWT,verifyInstructor, async (req, res) => {
   try {
     const newClass = req.body;
     const result = await classesCollection.insertOne(newClass);
@@ -146,7 +187,7 @@ app.post("/new-class", async (req, res) => {
 });
 
 // Get all classes
-app.get("/classes",verifyJWT, async (req, res) => {
+app.get("/classes", async (req, res) => {
   try {
     const approvedClasses = await classesCollection
       .find({ status: "panding" })
@@ -158,7 +199,7 @@ app.get("/classes",verifyJWT, async (req, res) => {
 });
 
 // Get instructor email address
-app.get("/classes/:email", async (req, res) => {
+app.get("/classes/:email",verifyJWT,verifyInstructor, async (req, res) => {
   try {
     const email = req.params.email;
     const query = { instructorEmail: email };
@@ -170,7 +211,7 @@ app.get("/classes/:email", async (req, res) => {
 });
 
 // Change class status
-app.patch("/change-status/:id", async (req, res) => {
+app.patch("/change-status/:id",verifyJWT,verifyAdmin, async (req, res) => {
   try {
     const id = req.params.id;
     const status = req.body.status;
@@ -229,7 +270,7 @@ app.get("/class/:id", async (req, res) => {
 });
 
 // Update class
-app.put("/update-class/:id", async (req, res) => {
+app.put("/update-class/:id",verifyJWT,verifyInstructor, async (req, res) => {
   try {
     const id = req.params.id;
     const updatedData = req.body;
@@ -268,13 +309,13 @@ app.put("/update-class/:id", async (req, res) => {
 // -------------classes route end---------------
 // -------------cart route start---------------
 // cart collection
-app.post("/add-to-cart", async (req, res) => {
+app.post("/add-to-cart",verifyJWT, async (req, res) => {
   const newCartItem = req.body;
   const result = await cartCollection.insertOne(newCartItem);
   res.send(result);
 });
 // cart item get by id
-app.get("/cart-item/:id", async (req, res) => {
+app.get("/cart-item/:id",verifyJWT, async (req, res) => {
   const id = req.params.id;
   const email = req.body.email;
   const query = {
@@ -287,7 +328,7 @@ app.get("/cart-item/:id", async (req, res) => {
 });
 
 // cart item get by email address
-app.get("/cart/:email", async (req, res) => {
+app.get("/cart/:email",verifyJWT, async (req, res) => {
   const { email } = req.params;
   const query = { userMail: email };
   const projection = { classId: 1 };
@@ -300,7 +341,7 @@ app.get("/cart/:email", async (req, res) => {
   res.send(result);
 });
 // DELETE route for removing a cart item
-app.delete("/delete-cart-item/:id", async (req, res) => {
+app.delete("/delete-cart-item/:id",verifyJWT, async (req, res) => {
   const id = req.params.id;
   const query = { classId: id };
   const result = await cartCollection.deleteOne(query);
@@ -322,7 +363,7 @@ app.post("/create-payment-intent", async (req, res) => {
   });
 });
 // post payment info to DB
-app.post("/payment-info", async (req, res) => {
+app.post("/payment-info",verifyJWT, async (req, res) => {
   const paymentInfo = req.body;
   const classesId = paymentInfo.classesId;
   const userEmail = paymentInfo.userEmail;
@@ -443,7 +484,7 @@ app.get("/popular-instructors", async (req, res) => {
   res.send(result);
 });
 // admin status
-app.get("/admin-stats", async (req, res) => {
+app.get("/admin-stats",verifyJWT,verifyAdmin, async (req, res) => {
   const approvedClasses = (
     await classesCollection.find({ status: "approved" })
   ).toArray().length;
@@ -464,7 +505,7 @@ app.get("/admin-stats", async (req, res) => {
   };
   res.send(result);
 });
-app.get('/enrolled-classes/:email', async (req, res) => {
+app.get('/enrolled-classes/:email',verifyJWT, async (req, res) => {
   const email = req.params.email;
   const query = { userEail: email };
   const pipeline = [
